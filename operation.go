@@ -22,7 +22,7 @@ const (
 
 // Operation represents a single request to a RESTful endpoint, it is used to build the actual http.Request
 type Operation struct {
-	config          *Config
+	config          *OperationBuilder
 	pathTemplate    string
 	pathTemplateVar map[string]string
 	body            io.Reader
@@ -33,7 +33,7 @@ type Operation struct {
 	merr            *multierror.Error
 }
 
-func newOperation(method string, config *Config) *Operation {
+func newOperation(method string, config *OperationBuilder) *Operation {
 	return &Operation{
 		pathTemplateVar: make(map[string]string),
 		headers:         make(map[string]string),

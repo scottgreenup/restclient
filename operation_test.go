@@ -91,20 +91,19 @@ func TestFullExample(t *testing.T) {
 		WithEndpoint("https://api.trello.com/1/").
 		SetAuthenticationMethod(BasicAuthenticationMethod)
 
-	operation, err := config.NewOperation(http.MethodPost)
-	require.NoError(t, err)
+	operation, _ := config.NewOperation(http.MethodPost)
 
 	req, err := operation.
 		WithPath("boards/{boardid}/cards/{cardid}").
 		WithPathVar("boardid", "12345").
 		WithPathVar("cardid", "12345").
 		BodyFromJSONString(`{"name": "Seymour Butts"}`).
-		Authenticate(AuthenticationStruct{Username: "john", Password: "random1234"}).
+		Authenticate().
 		BuildRequest()
 
 	require.NoError(t, err)
 
-	// resp, err := http.DefaultClient.Do(req)
+	//resp, err := http.DefaultClient.Do(req)
 
 	require.Equal(t, "https://api.trello.com/1/boards/12345/cards/12345", req.URL.String())
 	require.Equal(t, "application/json", req.Header.Get("Content-Type"))
