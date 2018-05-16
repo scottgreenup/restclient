@@ -1,14 +1,18 @@
 package restclient
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/stretchify/require"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewConfig(t *testing.T) {
-    config := NewConfig()
-    err := config.Validate()
+	config := NewConfig()
+	require.Error(t, config.Validate())
+}
 
-    require.Error(t, err)
+func TestWithEndpoint(t *testing.T) {
+	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	err := config.Validate()
+	require.NoError(t, err)
 }
