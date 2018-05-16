@@ -117,10 +117,7 @@ func (o *Operation) BuildRequest() (*http.Request, error) {
 }
 
 func (o *Operation) renderURL() (*url.URL, error) {
-
-	if strings.HasPrefix(o.pathTemplate, "/") {
-		o.pathTemplate = o.pathTemplate[1:]
-	}
+	o.pathTemplate = strings.TrimPrefix(o.pathTemplate, "/")
 
 	path, err := format(o.pathTemplate, o.pathTemplateVar)
 	if err != nil {
