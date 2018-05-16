@@ -59,8 +59,12 @@ func (o *Operation) BodyFromJSON(v interface{}) *Operation {
 
 // BodyFromJSONString uses the string as JSON for the request
 func (o *Operation) BodyFromJSONString(s string) *Operation {
-	o.body = strings.NewReader(s)
-	o.contentType = ContentTypeJSON
+	if err := json.Unmarshal([]byte(s), &map[string]interface{}{}); err != nil {
+		o.merr = multierror.Append(o.merr, errors.Wrap(err, "BodyFromJSONString received string that was not valid JSON"))
+	} else {
+		o.body = strings.NewReader(s)
+		o.contentType = ContentTypeJSON
+	}
 	return o
 }
 
@@ -113,6 +117,8 @@ func (o *Operation) BuildRequest() (*http.Request, error) {
 		request.Header.Add(key, value)
 	}
 
+	request.Header.Add("Content-Type", o.contentType)
+
 	return request, nil
 }
 
@@ -141,6 +147,11 @@ func format(format string, vars map[string]string) (string, error) {
 		vars = make(map[string]string)
 	}
 
+	used := map[string]bool{}
+	for k, _ := range vars {
+		used[k] = false
+	}
+
 	b := []byte(format)
 	loc := formatRegExp.FindIndex(b)
 
@@ -149,7 +160,6 @@ func format(format string, vars map[string]string) (string, error) {
 
 	for loc != nil {
 		key := string(b[loc[0]+1 : loc[1]-1])
-
 		value, ok := vars[key]
 
 		if !ok {
@@ -162,6 +172,7 @@ func format(format string, vars map[string]string) (string, error) {
 			newString = newString + string(b[prevEnd:loc[0]]) + value
 		}
 
+		used[key] = true
 		prevEnd = loc[1]
 
 		if prevEnd < len(b) {
@@ -174,8 +185,13 @@ func format(format string, vars map[string]string) (string, error) {
 	}
 
 	if prevEnd < len(b) {
-
 		newString = newString + string(b[prevEnd:])
+	}
+
+	for key, wasUsed := range used {
+		if !wasUsed {
+			return "", errors.Errorf("url did not use %s which was provided through WithPathVar", key)
+		}
 	}
 
 	return newString, nil
