@@ -9,19 +9,32 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Config represents the common ground that the endpoints of a RESTful API has. Attributes like the HTTP client, and the
+// base URL
 type Config struct {
-	endpoint   *url.URL
-	httpClient *http.Client
+	Endpoint   *url.URL
+	HTTPClient *http.Client
 
 	merr *multierror.Error
 }
 
+// NewConfig generates a new configuration
 func NewConfig() *Config {
 	return &Config{
-		httpClient: http.DefaultClient,
+		HTTPClient: http.DefaultClient,
 	}
 }
 
+// NewOperation generates a new operation from the Config, giving the operation the common ground set by the config
+func (c *Config) NewOperation(method string) (*Operation, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+
+	return newOperation(method, c), nil
+}
+
+// WithEndpoint sets the base URL, i.e. the URL prefix for all of our API calls
 func (c *Config) WithEndpoint(u string) *Config {
 	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		c.merr = multierror.Append(c.merr, errors.New("WithEndpoint endpoint is missing http:// or https:// prefix"))
@@ -34,29 +47,30 @@ func (c *Config) WithEndpoint(u string) *Config {
 		return c
 	}
 
-	c.endpoint = endpoint
+	c.Endpoint = endpoint
 	return c
 }
 
+// WithHTTPClient sets a custom http client to use, by default the http.DefaultClient is used
 func (c *Config) WithHTTPClient(client *http.Client) *Config {
 	if client == nil {
 		c.merr = multierror.Append(c.merr, errors.New("WithHTTPClient called with nil"))
 		return c
 	}
 
-	c.httpClient = client
+	c.HTTPClient = client
 	return c
 }
 
-func (c *Config) Validate() (err error) {
-
+// Validate will validate the config
+func (c *Config) Validate() error {
 	var merr *multierror.Error
 
 	if c.merr == nil {
 		merr = multierror.Append(merr, c.merr)
 	}
 
-	if c.endpoint == nil {
+	if c.Endpoint == nil {
 		merr = multierror.Append(merr, errors.New("endpoint is nil"))
 	}
 
