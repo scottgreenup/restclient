@@ -1,8 +1,10 @@
 package restclient
 
 import (
+	"encoding/base64"
 	"testing"
 
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -72,9 +74,22 @@ func TestJSONStringInvalid(t *testing.T) {
 }
 
 func TestFullExample(t *testing.T) {
+
+	type AuthenticationStruct struct {
+		Username string
+		Password string
+	}
+
+	BasicAuthenticationMethod := func(req *http.Request, v ...interface{}) (*http.Request, error) {
+		auth := v[0].(AuthenticationStruct)
+		code := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", auth.Username, auth.Password)))
+		req.Header.Add("Authorization", fmt.Sprintf("Basic %s", code))
+		return req, nil
+	}
+
 	config := NewConfig().
 		WithEndpoint("https://api.trello.com/1/").
-		WithHTTPClient(&http.Client{})
+		SetAuthenticationMethod(BasicAuthenticationMethod)
 
 	operation, err := config.NewOperation(http.MethodPost)
 	require.NoError(t, err)
@@ -84,7 +99,12 @@ func TestFullExample(t *testing.T) {
 		WithPathVar("boardid", "12345").
 		WithPathVar("cardid", "12345").
 		BodyFromJSONString(`{"name": "Seymour Butts"}`).
+		Authenticate(AuthenticationStruct{Username: "john", Password: "random1234"}).
 		BuildRequest()
+
+	require.NoError(t, err)
+
+	// resp, err := http.DefaultClient.Do(req)
 
 	require.Equal(t, "https://api.trello.com/1/boards/12345/cards/12345", req.URL.String())
 	require.Equal(t, "application/json", req.Header.Get("Content-Type"))

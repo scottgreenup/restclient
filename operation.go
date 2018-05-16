@@ -29,6 +29,7 @@ type Operation struct {
 	method          string
 	contentType     string
 	headers         map[string]string
+	authentication  []interface{}
 	merr            *multierror.Error
 }
 
@@ -97,6 +98,16 @@ func (o *Operation) WithHeader(key, value string) *Operation {
 	return o
 }
 
+// Authenticate activates the authentication method given to the config
+func (o *Operation) Authenticate(v ...interface{}) *Operation {
+	if o.config.AuthMethod == nil {
+		o.merr = multierror.Append(o.merr, errors.New("Authenticate called without SetAuthenticationMethod"))
+		return o
+	}
+	o.authentication = v
+	return o
+}
+
 // BuildRequest builds the http.Request from the operation
 func (o *Operation) BuildRequest() (*http.Request, error) {
 	if o.merr != nil {
@@ -118,6 +129,13 @@ func (o *Operation) BuildRequest() (*http.Request, error) {
 	}
 
 	request.Header.Add("Content-Type", o.contentType)
+
+	if o.config.AuthMethod != nil {
+		request, err = o.config.AuthMethod(request, o.authentication...)
+		if err != nil {
+			return nil, errors.Wrap(err, "could embed authentication into request")
+		}
+	}
 
 	return request, nil
 }
@@ -148,7 +166,7 @@ func format(format string, vars map[string]string) (string, error) {
 	}
 
 	used := map[string]bool{}
-	for k, _ := range vars {
+	for k := range vars {
 		used[k] = false
 	}
 
