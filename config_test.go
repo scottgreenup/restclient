@@ -7,12 +7,12 @@ import (
 )
 
 func TestNewConfig(t *testing.T) {
-	config := NewConfig()
+	config := NewRequestBuilder()
 	require.Error(t, config.Validate())
 }
 
 func TestWithEndpoint(t *testing.T) {
-	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	config := NewRequestBuilder().WithEndpoint("https://api.trello.com/1/")
 	err := config.Validate()
 	require.NoError(t, err)
 }

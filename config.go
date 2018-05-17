@@ -11,7 +11,7 @@ import (
 
 // Config represents the common ground that the endpoints of a RESTful API has. Attributes like the HTTP client, and the
 // base URL. This acts as an OperationBuilder, where the OperationBuilder acts as a RequestBuilder.
-type Config struct {
+type RequestBuilder struct {
 	Endpoint   *url.URL
 	AuthMethod AuthenticationMethod
 
@@ -19,30 +19,30 @@ type Config struct {
 }
 
 // NewConfig generates a new configuration
-func NewConfig() *Config {
-	return &Config{}
+func NewRequestBuilder() *RequestBuilder {
+	return &RequestBuilder{}
 }
 
 // AuthenticationMethod represents the user-made way of setting a request to be authenticated
 type AuthenticationMethod func(req *http.Request, v ...interface{}) (*http.Request, error)
 
 // SetAuthenticationMethod sets the AuthenticationMethod for operations, which is invoked with Operation.Authenticate()
-func (c *Config) SetAuthenticationMethod(authMethod AuthenticationMethod) *Config {
+func (c *RequestBuilder) WithAuthenticationMethod(authMethod AuthenticationMethod) *RequestBuilder {
 	c.AuthMethod = authMethod
 	return c
 }
 
 // NewOperation generates a new operation from the Config, giving the operation the common ground set by the config
-func (c *Config) NewOperation(method string) (*Operation, error) {
+func (c *RequestBuilder) NewOperation(method string) (*Request, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 
-	return newOperation(method, c), nil
+	return newRequest(method, c), nil
 }
 
 // WithEndpoint sets the base URL, i.e. the URL prefix for all of our API calls
-func (c *Config) WithEndpoint(u string) *Config {
+func (c *RequestBuilder) WithEndpoint(u string) *RequestBuilder {
 	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		c.merr = multierror.Append(c.merr, errors.New("WithEndpoint endpoint is missing http:// or https:// prefix"))
 		return c
@@ -59,7 +59,7 @@ func (c *Config) WithEndpoint(u string) *Config {
 }
 
 // Validate will validate the config
-func (c *Config) Validate() error {
+func (c *RequestBuilder) Validate() error {
 	var merr *multierror.Error
 
 	if c.merr == nil {
