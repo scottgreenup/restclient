@@ -16,3 +16,19 @@ func TestWithEndpoint(t *testing.T) {
 	err := config.Validate()
 	require.NoError(t, err)
 }
+
+func TestNewMutator(t *testing.T) {
+	rm := NewRequestMutator()
+	require.Len(t, rm.mutations, 0)
+}
+
+func TestURL(t *testing.T) {
+	rm := NewRequestMutator(
+		BaseURL("https://scottgreenup.com/"),
+		ResolvePath("/api/whatever"),
+	)
+
+	req, err := rm.NewRequest()
+	require.NoError(t, err)
+	require.Equal(t, req.URL.String(), "https://scottgreenup.com/api/whatever")
+}

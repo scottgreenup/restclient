@@ -9,6 +9,65 @@ import (
 	"github.com/pkg/errors"
 )
 
+type RequestMutation func(req *http.Request) error
+
+type RequestMutator struct {
+	mutations []RequestMutation
+}
+
+func NewRequestMutator(commonMutations ...RequestMutation) *RequestMutator {
+	return &RequestMutator{
+		mutations: commonMutations,
+	}
+}
+
+func (rm *RequestMutator) Mutate(req *http.Request, mutations ...RequestMutation) error {
+	mutations = append(rm.mutations, mutations...)
+	for _, mutation := range mutations {
+		if err := mutation(req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rm *RequestMutator) NewRequest(mutations ...RequestMutation) (*http.Request, error) {
+	req, err := http.NewRequest("", "", nil)
+
+	// This should NEVER happen, else something is very broken
+	if err != nil {
+		panic(err)
+	}
+
+	if err := rm.Mutate(req, mutations...); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func BaseURL(base string) RequestMutation {
+	return func(req *http.Request) error {
+		u, err := url.Parse(base)
+		if err != nil {
+			return err
+		}
+		req.URL = u
+		return nil
+	}
+}
+
+func ResolvePath(path string) RequestMutation {
+	return func(req *http.Request) error {
+		u, err := url.Parse(path)
+		if err != nil {
+			return err
+		}
+		req.URL = req.URL.ResolveReference(u)
+		return nil
+	}
+}
+
 // Config represents the common ground that the endpoints of a RESTful API has. Attributes like the HTTP client, and the
 // base URL. This acts as an OperationBuilder, where the OperationBuilder acts as a RequestBuilder.
 type RequestBuilder struct {
