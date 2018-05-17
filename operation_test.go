@@ -17,7 +17,7 @@ func TestJSON(t *testing.T) {
 
 	x := Foo{A: 1}
 
-	config := NewConfig().
+	config := NewRequestBuilder().
 		WithEndpoint("https://api.trello.com/1/")
 
 	operation, err := config.NewOperation(http.MethodGet)
@@ -41,7 +41,7 @@ func TestJSONStringValid(t *testing.T) {
 		{`{"words": 1, "child": {"a": "words"}}`},
 	}
 
-	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	config := NewRequestBuilder().WithEndpoint("https://api.trello.com/1/")
 
 	for _, tc := range cases {
 		operation, err := config.NewOperation(http.MethodGet)
@@ -62,7 +62,7 @@ func TestJSONStringInvalid(t *testing.T) {
 		{`content=3`},
 	}
 
-	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	config := NewRequestBuilder().WithEndpoint("https://api.trello.com/1/")
 
 	for _, tc := range cases {
 		operation, err := config.NewOperation(http.MethodGet)
@@ -87,9 +87,9 @@ func TestFullExample(t *testing.T) {
 		return req, nil
 	}
 
-	config := NewConfig().
+	config := NewRequestBuilder().
 		WithEndpoint("https://api.trello.com/1/").
-		SetAuthenticationMethod(BasicAuthenticationMethod)
+		WithAuthenticationMethod(BasicAuthenticationMethod)
 
 	operation, _ := config.NewOperation(http.MethodPost)
 
@@ -98,7 +98,7 @@ func TestFullExample(t *testing.T) {
 		WithPathVar("boardid", "12345").
 		WithPathVar("cardid", "12345").
 		BodyFromJSONString(`{"name": "Seymour Butts"}`).
-		Authenticate().
+		Authenticate(AuthenticationStruct{Username: "", Password: ""}).
 		BuildRequest()
 
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestWithPathValid(t *testing.T) {
 		{"/boards/{id}/cards/{cardid}", map[string]string{"id": "10", "cardid": "123"}},
 	}
 
-	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	config := NewRequestBuilder().WithEndpoint("https://api.trello.com/1/")
 
 	for _, tc := range cases {
 		operation, err := config.NewOperation(http.MethodGet)
@@ -151,7 +151,7 @@ func TestWithPathInvalid(t *testing.T) {
 		{"/boards/{hello}", map[string]string{"hello": "20", "id": "10"}},
 	}
 
-	config := NewConfig().WithEndpoint("https://api.trello.com/1/")
+	config := NewRequestBuilder().WithEndpoint("https://api.trello.com/1/")
 
 	for _, tc := range cases {
 		operation, err := config.NewOperation(http.MethodGet)

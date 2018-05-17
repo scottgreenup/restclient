@@ -21,8 +21,8 @@ const (
 )
 
 // Operation represents a single request to a RESTful endpoint, it is used to build the actual http.Request
-type Operation struct {
-	config          *OperationBuilder
+type Request struct {
+	config          *RequestBuilder
 	pathTemplate    string
 	pathTemplateVar map[string]string
 	body            io.Reader
@@ -33,8 +33,8 @@ type Operation struct {
 	merr            *multierror.Error
 }
 
-func newOperation(method string, config *OperationBuilder) *Operation {
-	return &Operation{
+func newRequest(method string, config *RequestBuilder) *Request {
+	return &Request{
 		pathTemplateVar: make(map[string]string),
 		headers:         make(map[string]string),
 		method:          method,
@@ -44,7 +44,7 @@ func newOperation(method string, config *OperationBuilder) *Operation {
 }
 
 // BodyFromJSON marshals the interface `v` into JSON for the request
-func (o *Operation) BodyFromJSON(v interface{}) *Operation {
+func (o *Request) BodyFromJSON(v interface{}) *Request {
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(v)
 
@@ -59,7 +59,7 @@ func (o *Operation) BodyFromJSON(v interface{}) *Operation {
 }
 
 // BodyFromJSONString uses the string as JSON for the request
-func (o *Operation) BodyFromJSONString(s string) *Operation {
+func (o *Request) BodyFromJSONString(s string) *Request {
 	if err := json.Unmarshal([]byte(s), &map[string]interface{}{}); err != nil {
 		o.merr = multierror.Append(o.merr, errors.Wrap(err, "BodyFromJSONString received string that was not valid JSON"))
 	} else {
@@ -71,7 +71,7 @@ func (o *Operation) BodyFromJSONString(s string) *Operation {
 
 // WithPath changes the endpoint of the RESTful API that we are hitting. The path is treated as a template, variables
 // are signalled with {}, e.g. "/boards/{id}"
-func (o *Operation) WithPath(template string) *Operation {
+func (o *Request) WithPath(template string) *Request {
 	if o.pathTemplate != "" {
 		o.merr = multierror.Append(o.merr, errors.New("WithPath was already called"))
 		return o
@@ -87,19 +87,19 @@ func (o *Operation) WithPath(template string) *Operation {
 }
 
 // WithPathVar sets a variable for the path template
-func (o *Operation) WithPathVar(key, value string) *Operation {
+func (o *Request) WithPathVar(key, value string) *Request {
 	o.pathTemplateVar[key] = value
 	return o
 }
 
 // WithHeader adds a header to the request
-func (o *Operation) WithHeader(key, value string) *Operation {
+func (o *Request) WithHeader(key, value string) *Request {
 	o.headers[key] = value
 	return o
 }
 
 // Authenticate activates the authentication method given to the config
-func (o *Operation) Authenticate(v ...interface{}) *Operation {
+func (o *Request) Authenticate(v ...interface{}) *Request {
 	if o.config.AuthMethod == nil {
 		o.merr = multierror.Append(o.merr, errors.New("Authenticate called without SetAuthenticationMethod"))
 		return o
@@ -109,7 +109,7 @@ func (o *Operation) Authenticate(v ...interface{}) *Operation {
 }
 
 // BuildRequest builds the http.Request from the operation
-func (o *Operation) BuildRequest() (*http.Request, error) {
+func (o *Request) BuildRequest() (*http.Request, error) {
 	if o.merr != nil {
 		return nil, o.merr
 	}
@@ -140,7 +140,7 @@ func (o *Operation) BuildRequest() (*http.Request, error) {
 	return request, nil
 }
 
-func (o *Operation) renderURL() (*url.URL, error) {
+func (o *Request) renderURL() (*url.URL, error) {
 	o.pathTemplate = strings.TrimPrefix(o.pathTemplate, "/")
 
 	path, err := format(o.pathTemplate, o.pathTemplateVar)
