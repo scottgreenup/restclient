@@ -12,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+type RequestMutation func(req *http.Request) error
+
 const (
-	// ContentTypeDefault is the default for text documents
-	ContentTypeDefault = "text/plain"
 	// ContentTypeJSON is the default for JSON strings
 	ContentTypeJSON = "application/json"
 )

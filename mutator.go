@@ -4,8 +4,6 @@ import (
 	"net/http"
 )
 
-type RequestMutation func(req *http.Request) error
-
 type RequestMutator struct {
 	mutations []RequestMutation
 }
