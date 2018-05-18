@@ -15,6 +15,17 @@ func TestNewMutator(t *testing.T) {
 }
 
 func ExampleAuthenticationMethod() {
+
+	type ExampleRequest struct {
+		Version uint64 `json:"number"`
+		Hash    string `json:"hash"`
+	}
+
+	requestData := &ExampleRequest{
+		Version: 1,
+		Hash:    "1c76f1f33f12c14a63026f71c8d17ab2",
+	}
+
 	rm := NewRequestMutator(
 		BaseURL("https://scottgreenup.com/"),
 	)
@@ -28,10 +39,18 @@ func ExampleAuthenticationMethod() {
 	}
 
 	req, _ := rm.NewRequest(
-		ResolvePath("/api/whatever"),
-		BasicAuthMutator("admin", "supersecretpassword"),
+		ResolvePath("/api/example"),
+		Method(http.MethodPost),
+		BasicAuthMutator("MyUsername", "4RuwRmDkLm990qkXMK6obWK88S7pW3K3"),
+		BodyFromJSON(requestData),
 	)
 
-	fmt.Println("URL: ", req.URL.String())
-	fmt.Println("Authorization Header: ", req.Header.Get("Authorization"))
+	fmt.Println("URL:", req.URL.String())
+	fmt.Println("Content Length:", req.ContentLength)
+	fmt.Println("Authorization Header:", req.Header.Get("Authorization"))
+
+	// output:
+	// URL: https://scottgreenup.com/api/example
+	// Content Length: 55
+	// Authorization Header: Basic TXlVc2VybmFtZTo0UnV3Um1Ea0xtOTkwcWtYTUs2b2JXSzg4UzdwVzNLMw==
 }
