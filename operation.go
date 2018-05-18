@@ -42,6 +42,7 @@ func Body(body io.Reader) RequestMutation {
 		case *bytes.Buffer:
 			request.ContentLength = int64(v.Len())
 			buf := v.Bytes()
+			request.Body = ioutil.NopCloser(body)
 			request.GetBody = func() (io.ReadCloser, error) {
 				r := bytes.NewReader(buf)
 				return ioutil.NopCloser(r), nil
@@ -51,6 +52,7 @@ func Body(body io.Reader) RequestMutation {
 		case *bytes.Reader:
 			request.ContentLength = int64(v.Len())
 			snapshot := *v
+			request.Body = ioutil.NopCloser(body)
 			request.GetBody = func() (io.ReadCloser, error) {
 				r := snapshot
 				return ioutil.NopCloser(&r), nil
@@ -60,6 +62,7 @@ func Body(body io.Reader) RequestMutation {
 		case *strings.Reader:
 			request.ContentLength = int64(v.Len())
 			snapshot := *v
+			request.Body = ioutil.NopCloser(body)
 			request.GetBody = func() (io.ReadCloser, error) {
 				r := snapshot
 				return ioutil.NopCloser(&r), nil
@@ -117,8 +120,15 @@ func BodyFromJSONString(s string) RequestMutation {
 	}
 }
 
-// WithHeader adds a header to the request
-func WithHeader(key, value string) RequestMutation {
+func Method(method string) RequestMutation {
+	return func(request *http.Request) error {
+		request.Method = method
+		return nil
+	}
+}
+
+// Header adds a header to the request
+func Header(key, value string) RequestMutation {
 	return func(request *http.Request) error {
 		request.Header.Add(key, value)
 		return nil
