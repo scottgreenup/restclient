@@ -31,10 +31,10 @@ func ExampleAuthenticationMethod() {
 	)
 
 	BasicAuthMutator := func(username, password string) RequestMutation {
-		return func(req *http.Request) error {
+		return func(req *http.Request) (*http.Request, error) {
 			code := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", code))
-			return nil
+			return req, nil
 		}
 	}
 

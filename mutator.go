@@ -14,14 +14,16 @@ func NewRequestMutator(commonMutations ...RequestMutation) *RequestMutator {
 	}
 }
 
-func (rm *RequestMutator) Mutate(req *http.Request, mutations ...RequestMutation) error {
+func (rm *RequestMutator) Mutate(req *http.Request, mutations ...RequestMutation) (*http.Request, error) {
 	mutations = append(rm.mutations, mutations...)
 	for _, mutation := range mutations {
-		if err := mutation(req); err != nil {
-			return err
+		var err error
+		req, err = mutation(req)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	return req, nil
 }
 
 func (rm *RequestMutator) NewRequest(mutations ...RequestMutation) (*http.Request, error) {
@@ -32,7 +34,9 @@ func (rm *RequestMutator) NewRequest(mutations ...RequestMutation) (*http.Reques
 		panic(err)
 	}
 
-	if err := rm.Mutate(req, mutations...); err != nil {
+	req, err = rm.Mutate(req, mutations...)
+
+	if err != nil {
 		return nil, err
 	}
 
