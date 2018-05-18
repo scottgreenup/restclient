@@ -1,15 +1,23 @@
 package restclient
 
 import (
-	"encoding/base64"
 	"testing"
 
-	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
 )
 
+func TestURL(t *testing.T) {
+	rm := NewRequestMutator(
+		BaseURL("https://scottgreenup.com/"),
+		ResolvePath("/api/whatever"),
+	)
+
+	req, err := rm.NewRequest()
+	require.NoError(t, err)
+	require.Equal(t, req.URL.String(), "https://scottgreenup.com/api/whatever")
+}
+
+/*
 func TestJSON(t *testing.T) {
 	type Foo struct {
 		A int `json:"element_a"`
@@ -205,3 +213,4 @@ func TestFormatInvalid(t *testing.T) {
 		assert.Error(t, err)
 	}
 }
+*/

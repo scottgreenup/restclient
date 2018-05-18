@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
-	"regexp"
 )
 
 const (
@@ -20,198 +19,132 @@ const (
 	ContentTypeJSON = "application/json"
 )
 
-// Operation represents a single request to a RESTful endpoint, it is used to build the actual http.Request
-type Request struct {
-	config          *RequestBuilder
-	pathTemplate    string
-	pathTemplateVar map[string]string
-	body            io.Reader
-	method          string
-	contentType     string
-	headers         map[string]string
-	authentication  []interface{}
-	merr            *multierror.Error
-}
+func Body(body io.Reader) RequestMutation {
+	return func(request *http.Request) error {
+		if body == nil {
+			request.Body = nil
+			return nil
+		}
 
-func newRequest(method string, config *RequestBuilder) *Request {
-	return &Request{
-		pathTemplateVar: make(map[string]string),
-		headers:         make(map[string]string),
-		method:          method,
-		contentType:     ContentTypeDefault,
-		config:          config,
+		// If the ContentLength is actually 0, we can signal that ContentLength is ACTUALLY 0, and not just unknown
+		OptimizeIfEmpty := func(request *http.Request) {
+			if request.ContentLength == 0 {
+
+				// This signals that the ContentLengt
+				request.Body = http.NoBody
+				request.GetBody = func() (io.ReadCloser, error) {
+					return http.NoBody, nil
+				}
+			}
+		}
+
+		switch v := body.(type) {
+		case *bytes.Buffer:
+			request.ContentLength = int64(v.Len())
+			buf := v.Bytes()
+			request.GetBody = func() (io.ReadCloser, error) {
+				r := bytes.NewReader(buf)
+				return ioutil.NopCloser(r), nil
+			}
+			OptimizeIfEmpty(request)
+
+		case *bytes.Reader:
+			request.ContentLength = int64(v.Len())
+			snapshot := *v
+			request.GetBody = func() (io.ReadCloser, error) {
+				r := snapshot
+				return ioutil.NopCloser(&r), nil
+			}
+			OptimizeIfEmpty(request)
+
+		case *strings.Reader:
+			request.ContentLength = int64(v.Len())
+			snapshot := *v
+			request.GetBody = func() (io.ReadCloser, error) {
+				r := snapshot
+				return ioutil.NopCloser(&r), nil
+			}
+			OptimizeIfEmpty(request)
+
+		default:
+			// We don't have the same backwards compatibility issues as request.go:
+			// https://github.com/golang/go/blob/226651a541/src/net/http/request.go#L823-L839
+
+			// Convert the body to a ReadCloser
+			rc, ok := body.(io.ReadCloser)
+			if !ok {
+				rc = ioutil.NopCloser(body)
+			}
+			request.Body = rc
+			request.GetBody = func() (io.ReadCloser, error) {
+				return rc, nil
+			}
+
+			// We don't know how to get the Length, this is signalled by setting ContentLength to 0
+			request.ContentLength = 0
+		}
+
+		return nil
 	}
 }
 
 // BodyFromJSON marshals the interface `v` into JSON for the request
-func (o *Request) BodyFromJSON(v interface{}) *Request {
-	b := new(bytes.Buffer)
-	err := json.NewEncoder(b).Encode(v)
-
-	if err != nil {
-		o.merr = multierror.Append(o.merr, errors.Wrap(err, "could not encode body"))
-		return o
+func BodyFromJSON(v interface{}) RequestMutation {
+	return func(request *http.Request) error {
+		b := new(bytes.Buffer)
+		if err := json.NewEncoder(b).Encode(v); err != nil {
+			return errors.Wrap(err, "could not encode body")
+		}
+		if err := Body(b)(request); err != nil {
+			return errors.Wrap(err, "could not set body")
+		}
+		request.Header.Set("Content-Type", ContentTypeJSON)
+		return nil
 	}
-
-	o.body = b
-	o.contentType = ContentTypeJSON
-	return o
 }
 
 // BodyFromJSONString uses the string as JSON for the request
-func (o *Request) BodyFromJSONString(s string) *Request {
-	if err := json.Unmarshal([]byte(s), &map[string]interface{}{}); err != nil {
-		o.merr = multierror.Append(o.merr, errors.Wrap(err, "BodyFromJSONString received string that was not valid JSON"))
-	} else {
-		o.body = strings.NewReader(s)
-		o.contentType = ContentTypeJSON
+func BodyFromJSONString(s string) RequestMutation {
+	return func(request *http.Request) error {
+		if err := json.Unmarshal([]byte(s), &map[string]interface{}{}); err != nil {
+			return errors.Wrap(err, "BodyFromJSONString received string that was not valid JSON")
+		}
+		if err := Body(strings.NewReader(s))(request); err != nil {
+			return errors.Wrap(err, "could not set body")
+		}
+		request.Header.Set("Content-Type", ContentTypeJSON)
+		return nil
 	}
-	return o
-}
-
-// WithPath changes the endpoint of the RESTful API that we are hitting. The path is treated as a template, variables
-// are signalled with {}, e.g. "/boards/{id}"
-func (o *Request) WithPath(template string) *Request {
-	if o.pathTemplate != "" {
-		o.merr = multierror.Append(o.merr, errors.New("WithPath was already called"))
-		return o
-	}
-
-	if template == "" {
-		o.merr = multierror.Append(o.merr, errors.New("WithPath was called with empty string"))
-		return o
-	}
-
-	o.pathTemplate = template
-	return o
-}
-
-// WithPathVar sets a variable for the path template
-func (o *Request) WithPathVar(key, value string) *Request {
-	o.pathTemplateVar[key] = value
-	return o
 }
 
 // WithHeader adds a header to the request
-func (o *Request) WithHeader(key, value string) *Request {
-	o.headers[key] = value
-	return o
-}
-
-// Authenticate activates the authentication method given to the config
-func (o *Request) Authenticate(v ...interface{}) *Request {
-	if o.config.AuthMethod == nil {
-		o.merr = multierror.Append(o.merr, errors.New("Authenticate called without SetAuthenticationMethod"))
-		return o
-	}
-	o.authentication = v
-	return o
-}
-
-// BuildRequest builds the http.Request from the operation
-func (o *Request) BuildRequest() (*http.Request, error) {
-	if o.merr != nil {
-		return nil, o.merr
-	}
-
-	u, err := o.renderURL()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not render URL")
-	}
-
-	request, err := http.NewRequest(o.method, u.String(), o.body)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not create request")
-	}
-
-	for key, value := range o.headers {
+func WithHeader(key, value string) RequestMutation {
+	return func(request *http.Request) error {
 		request.Header.Add(key, value)
+		return nil
 	}
+}
 
-	request.Header.Add("Content-Type", o.contentType)
-
-	if o.config.AuthMethod != nil {
-		request, err = o.config.AuthMethod(request, o.authentication...)
+// BaseURL sets the URL of the request from a URL string
+func BaseURL(base string) RequestMutation {
+	return func(req *http.Request) error {
+		u, err := url.Parse(base)
 		if err != nil {
-			return nil, errors.Wrap(err, "could embed authentication into request")
+			return err
 		}
+		req.URL = u
+		return nil
 	}
-
-	return request, nil
 }
 
-func (o *Request) renderURL() (*url.URL, error) {
-	o.pathTemplate = strings.TrimPrefix(o.pathTemplate, "/")
-
-	path, err := format(o.pathTemplate, o.pathTemplateVar)
-	if err != nil {
-		return nil, err
-	}
-
-	u, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return o.config.Endpoint.ResolveReference(u), nil
-}
-
-var (
-	formatRegExp = regexp.MustCompile("{[A-Za-z0-9_]+}")
-)
-
-func format(format string, vars map[string]string) (string, error) {
-	if vars == nil {
-		vars = make(map[string]string)
-	}
-
-	used := map[string]bool{}
-	for k := range vars {
-		used[k] = false
-	}
-
-	b := []byte(format)
-	loc := formatRegExp.FindIndex(b)
-
-	newString := ""
-	prevEnd := 0
-
-	for loc != nil {
-		key := string(b[loc[0]+1 : loc[1]-1])
-		value, ok := vars[key]
-
-		if !ok {
-			return "", errors.Errorf("url contained reference to variable %s which was not supplied through WithPathVar", key)
+// ResolvePath sets the path of the request by resolving it on the request.URL
+func ResolvePath(path string) RequestMutation {
+	return func(req *http.Request) error {
+		u, err := url.Parse(path)
+		if err != nil {
+			return err
 		}
-
-		if prevEnd == loc[0] {
-			newString = newString + value
-		} else {
-			newString = newString + string(b[prevEnd:loc[0]]) + value
-		}
-
-		used[key] = true
-		prevEnd = loc[1]
-
-		if prevEnd < len(b) {
-			loc = formatRegExp.FindIndex(b[prevEnd:])
-			loc[0] += prevEnd
-			loc[1] += prevEnd
-		} else {
-			loc = nil
-		}
+		req.URL = req.URL.ResolveReference(u)
+		return nil
 	}
-
-	if prevEnd < len(b) {
-		newString = newString + string(b[prevEnd:])
-	}
-
-	for key, wasUsed := range used {
-		if !wasUsed {
-			return "", errors.Errorf("url did not use %s which was provided through WithPathVar", key)
-		}
-	}
-
-	return newString, nil
-
 }
