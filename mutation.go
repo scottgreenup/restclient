@@ -2,6 +2,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -9,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 
-	"context"
 	"github.com/pkg/errors"
 )
 

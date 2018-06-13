@@ -1,0 +1,13 @@
+language: go
+go:
+  - "1.10.x"
+
+os:
+  - linux
+
+install:
+  - make setup
+
+script:
+  - make lint
+  - make test
