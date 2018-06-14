@@ -163,7 +163,7 @@ func ResolvePath(path string) RequestMutation {
 		if err != nil {
 			return nil, err
 		}
-		req.URL = req.URL.ResolveReference(u)
+		req.URL.Path = req.URL.ResolveReference(u).Path
 		return req, nil
 	}
 }
