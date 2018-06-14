@@ -1,4 +1,9 @@
+
+
 # restclient
+
+[![GoDoc](https://godoc.org/github.com/scottgreenup/restclient?status.svg)](http://godoc.org/github.com/scottgreenup/restclient)
+[![Build Status](https://travis-ci.org/scottgreenup/restclient.svg?branch=master)](https://travis-ci.org/scottgreenup/restclient)
 
 ## Example Usage
 
