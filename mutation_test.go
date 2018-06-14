@@ -1,12 +1,12 @@
 package restclient
 
 import (
-	"testing"
-
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestURL(t *testing.T) {
@@ -37,7 +37,7 @@ func TestJSON(t *testing.T) {
 	data := &Foo{A: 1}
 
 	handler := func(w http.ResponseWriter, req *http.Request) {
-		defer req.Body.Close()
+		defer req.Body.Close() // nolint: errcheck
 
 		target := &Foo{}
 		decoder := json.NewDecoder(req.Body)
@@ -64,7 +64,7 @@ func TestJSON(t *testing.T) {
 
 	// Activate our handler
 	resp, err := http.DefaultClient.Do(req)
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	require.NoError(t, err)
 }
 

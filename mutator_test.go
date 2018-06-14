@@ -1,12 +1,12 @@
 package restclient
 
 import (
-	"testing"
-
 	"encoding/base64"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewMutator(t *testing.T) {
@@ -14,7 +14,7 @@ func TestNewMutator(t *testing.T) {
 	require.Len(t, rm.mutations, 0)
 }
 
-func ExampleAuthenticationMethod() {
+func ExampleRequestMutator() {
 
 	type ExampleRequest struct {
 		Version uint64 `json:"number"`
